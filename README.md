@@ -8,6 +8,16 @@ Stellar NFT App allows artists to mint, showcase, and transfer unique digital ar
 
 ## ✨ Features
 
+## ✅ Live & Connected
+
+This app is fully wired to a live Soroban smart contract deployed on Stellar Testnet.
+
+**Smart Contract:** [OrbitNFT-app](https://github.com/Keengfk/OrbitNFT-app)
+**Contract ID:** `CBU7UVJM7FAXB7AHCDMTKVJSUEE3PVTV2ROFOKO2P3IC4IKRTB45IHFA`
+**View on Stellar Expert:** https://stellar.expert/explorer/testnet/contract/CBU7UVJM7FAXB7AHCDMTKVJSUEE3PVTV2ROFOKO2P3IC4IKRTB45IHFA
+
+The app successfully compiles and runs, connecting wallet, mint, gallery, and transfer screens directly to on-chain contract calls.
+
 - 🔌 Connect Freighter wallet
 - 🖼️ Upload and mint digital art as NFTs on Stellar
 - 📦 Art metadata stored on IPFS permanently

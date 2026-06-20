@@ -1,165 +1,144 @@
-import * as StellarSdk from 'stellar-sdk';
-import { server, networkPassphrase, getAccount } from './stellar';
+import React, { useState } from 'react';
+import { mintNFTOnChain } from './contract';
 
-// ================================
-// IPFS UPLOAD SERVICE
-// ================================
+function MintNFT({ walletAddress }) {
+  const [artName, setArtName] = useState('');
+  const [description, setDescription] = useState('');
+  const [image, setImage] = useState(null);
+  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
 
-export const uploadToIPFS = async (imageFile, name, description) => {
-  try {
-    // Create form data
-    const formData = new FormData();
-    formData.append('file', imageFile);
+  const handleMint = async () => {
+    if (!walletAddress) {
+      setStatus('⚠️ Please connect your wallet first!');
+      return;
+    }
 
-    // Upload image to IPFS via NFT.Storage
-    const imageResponse = await fetch(
-      'https://api.nft.storage/upload',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.REACT_APP_NFT_STORAGE_KEY}`,
-        },
-        body: formData,
-      }
-    );
+    if (!artName || !description) {
+      setStatus('⚠️ Please fill in all fields!');
+      return;
+    }
 
-    const imageData = await imageResponse.json();
-    const imageUrl = `https://ipfs.io/ipfs/${imageData.value.cid}`;
+    try {
+      setLoading(true);
+      setStatus('🔄 Preparing transaction...');
 
-    // Create and upload metadata
-    const metadata = {
-      name,
-      description,
-      image: imageUrl,
-      created: new Date().toISOString(),
-      blockchain: 'Stellar',
-    };
+      // For now using a placeholder image URI - real IPFS upload comes next
+      const imageUri = image
+        ? `ipfs://placeholder-${Date.now()}`
+        : 'ipfs://no-image';
 
-    const metadataResponse = await fetch(
-      'https://api.nft.storage/upload',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.REACT_APP_NFT_STORAGE_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(metadata),
-      }
-    );
+      setStatus('🔄 Please confirm in Freighter wallet...');
 
-    const metadataData = await metadataResponse.json();
-    return `https://ipfs.io/ipfs/${metadataData.value.cid}`;
+      const result = await mintNFTOnChain(
+        walletAddress,
+        artName,
+        description,
+        imageUri
+      );
 
-  } catch (error) {
-    throw new Error('IPFS upload failed: ' + error.message);
-  }
+      setStatus(
+        `✅ NFT Minted On-Chain!\nToken ID: ${result.tokenId}\nTx: ${result.hash.slice(0, 10)}...`
+      );
+
+    } catch (error) {
+      setStatus('❌ ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.title}>🎨 Mint Your NFT</h2>
+
+      <div style={styles.field}>
+        <label style={styles.label}>Art Name</label>
+        <input
+          style={styles.input}
+          placeholder="e.g. Sunset in Lagos"
+          value={artName}
+          onChange={(e) => setArtName(e.target.value)}
+        />
+      </div>
+
+      <div style={styles.field}>
+        <label style={styles.label}>Description</label>
+        <textarea
+          style={styles.textarea}
+          placeholder="Describe your artwork..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+
+      <div style={styles.field}>
+        <label style={styles.label}>Upload Artwork</label>
+        <input
+          type="file"
+          accept="image/*"
+          style={styles.fileInput}
+          onChange={(e) => setImage(e.target.files[0])}
+        />
+        {image && (
+          <img
+            src={URL.createObjectURL(image)}
+            alt="preview"
+            style={styles.preview}
+          />
+        )}
+      </div>
+
+      <button
+        onClick={handleMint}
+        style={loading ? styles.buttonDisabled : styles.button}
+        disabled={loading}
+      >
+        {loading ? '⏳ Minting...' : '🚀 Mint NFT On-Chain'}
+      </button>
+
+      {status && <p style={styles.status}>{status}</p>}
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: '12px',
+    padding: '24px',
+    maxWidth: '400px',
+    margin: '20px auto',
+  },
+  title: { color: '#7c3aed', textAlign: 'center', marginBottom: '24px' },
+  field: { marginBottom: '16px' },
+  label: { display: 'block', color: '#888888', fontSize: '14px', marginBottom: '6px' },
+  input: {
+    width: '100%', padding: '12px', borderRadius: '8px',
+    border: '1px solid #333333', backgroundColor: '#0a0a0a',
+    color: '#ffffff', fontSize: '14px', boxSizing: 'border-box',
+  },
+  textarea: {
+    width: '100%', padding: '12px', borderRadius: '8px',
+    border: '1px solid #333333', backgroundColor: '#0a0a0a',
+    color: '#ffffff', fontSize: '14px', height: '80px', boxSizing: 'border-box',
+  },
+  fileInput: { color: '#ffffff', fontSize: '14px' },
+  preview: { width: '100%', borderRadius: '8px', marginTop: '10px', maxHeight: '200px', objectFit: 'cover' },
+  button: {
+    backgroundColor: '#7c3aed', color: '#ffffff', border: 'none',
+    borderRadius: '8px', padding: '14px', fontSize: '16px',
+    cursor: 'pointer', width: '100%', marginTop: '8px',
+  },
+  buttonDisabled: {
+    backgroundColor: '#444444', color: '#888888', border: 'none',
+    borderRadius: '8px', padding: '14px', fontSize: '16px',
+    width: '100%', marginTop: '8px',
+  },
+  status: {
+    marginTop: '16px', color: '#f59e0b', fontSize: '13px',
+    textAlign: 'center', whiteSpace: 'pre-line',
+  },
 };
 
-// ================================
-// NFT MINTING SERVICE
-// ================================
-
-export const mintNFT = async (
-  issuerSecretKey,
-  artName,
-  metadataUrl
-) => {
-  try {
-    const issuerKeypair = StellarSdk.Keypair.fromSecret(issuerSecretKey);
-    const issuerPublicKey = issuerKeypair.publicKey();
-
-    // Create unique asset code from art name
-    const assetCode = artName
-      .replace(/[^A-Z0-9]/gi, '')
-      .toUpperCase()
-      .slice(0, 12);
-
-    // Create NFT asset
-    const nftAsset = new StellarSdk.Asset(assetCode, issuerPublicKey);
-
-    // Load issuer account
-    const account = await getAccount(issuerPublicKey);
-
-    // Build transaction
-    const transaction = new StellarSdk.TransactionBuilder(account, {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase,
-    })
-      // Store metadata URL on chain
-      .addOperation(
-        StellarSdk.Operation.manageData({
-          name: 'nft_metadata',
-          value: metadataUrl.slice(0, 64),
-        })
-      )
-      // Issue exactly 1 NFT token
-      .addOperation(
-        StellarSdk.Operation.payment({
-          destination: issuerPublicKey,
-          asset: nftAsset,
-          amount: '1',
-        })
-      )
-      // Lock supply — no more can ever be minted
-      .addOperation(
-        StellarSdk.Operation.setOptions({
-          masterWeight: 0,
-        })
-      )
-      .setTimeout(30)
-      .build();
-
-    // Sign and submit
-    transaction.sign(issuerKeypair);
-    const result = await server.submitTransaction(transaction);
-
-    return {
-      success: true,
-      hash: result.hash,
-      assetCode,
-      metadataUrl,
-      issuer: issuerPublicKey,
-    };
-
-  } catch (error) {
-    throw new Error('Minting failed: ' + error.message);
-  }
-};
-
-// ================================
-// FULL MINT FLOW
-// ================================
-
-export const mintNFTFull = async (
-  issuerSecretKey,
-  imageFile,
-  artName,
-  description,
-  onStatusUpdate
-) => {
-  try {
-    // Step 1 - Upload to IPFS
-    onStatusUpdate('🔄 Uploading artwork to IPFS...');
-    const metadataUrl = await uploadToIPFS(
-      imageFile,
-      artName,
-      description
-    );
-
-    // Step 2 - Mint on Stellar
-    onStatusUpdate('🔄 Minting NFT on Stellar...');
-    const result = await mintNFT(
-      issuerSecretKey,
-      artName,
-      metadataUrl
-    );
-
-    // Step 3 - Done!
-    onStatusUpdate('✅ NFT Minted Successfully!');
-    return result;
-
-  } catch (error) {
-    onStatusUpdate('❌ ' + error.message);
-    throw error;
-  }
-};
+export default MintNFT;

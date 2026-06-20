@@ -1,160 +1,153 @@
-import { server, getAccount, shortAddress } from './stellar';
+import React, { useState, useEffect } from 'react';
+import { getTotalSupply, getTokenOwner } from './contract';
 
-// ================================
-// FETCH NFT METADATA FROM IPFS
-// ================================
+function Gallery({ walletAddress }) {
+  const [nfts, setNfts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [error, setError] = useState('');
 
-export const fetchIPFSMetadata = async (ipfsUrl) => {
-  try {
-    if (!ipfsUrl) return null;
+  useEffect(() => {
+    loadNFTs();
+  }, []);
 
-    // Convert IPFS URL to HTTP gateway URL
-    const httpUrl = ipfsUrl.replace(
-      'ipfs://',
-      'https://ipfs.io/ipfs/'
-    );
+  const loadNFTs = async () => {
+    try {
+      setLoading(true);
+      setError('');
 
-    const response = await fetch(httpUrl);
-    const metadata = await response.json();
-    return metadata;
+      const supply = await getTotalSupply();
 
-  } catch (error) {
-    console.error('Failed to fetch IPFS metadata:', error);
-    return null;
-  }
-};
+      if (supply === 0) {
+        setNfts([]);
+        setLoading(false);
+        return;
+      }
 
-// ================================
-// FETCH ALL NFTS FROM STELLAR
-// ================================
+      // Fetch owner for each token (0 to supply-1)
+      const tokenPromises = [];
+      for (let i = 0; i < supply; i++) {
+        tokenPromises.push(
+          getTokenOwner(i).then((owner) => ({
+            id: i,
+            owner,
+            name: `OrbitNFT #${i}`,
+            image: `https://picsum.photos/300/300?random=${i}`,
+          }))
+        );
+      }
 
-export const fetchNFTs = async (publicKey) => {
-  try {
-    // Load account from Stellar
-    const account = await getAccount(publicKey);
+      const tokens = await Promise.all(tokenPromises);
+      setNfts(tokens.filter((t) => t.owner !== null));
 
-    // Filter assets with balance of exactly 1
-    const nftBalances = account.balances.filter(
-      (balance) =>
-        balance.asset_type !== 'native' &&
-        parseFloat(balance.balance) === 1
-    );
-
-    if (nftBalances.length === 0) return [];
-
-    // Fetch metadata for each NFT
-    const nftsWithMetadata = await Promise.all(
-      nftBalances.map(async (nft) => {
-        try {
-          // Fetch account data for metadata URL
-          const issuerAccount = await server
-            .loadAccount(nft.asset_issuer);
-
-          // Get metadata URL from account data
-          const metadataEntry = issuerAccount.data_attr
-            ? issuerAccount.data_attr['nft_metadata']
-            : null;
-
-          let metadata = null;
-          if (metadataEntry) {
-            const metadataUrl = Buffer.from(
-              metadataEntry,
-              'base64'
-            ).toString('utf-8');
-            metadata = await fetchIPFSMetadata(metadataUrl);
-          }
-
-          return {
-            id: `${nft.asset_code}-${nft.asset_issuer}`,
-            code: nft.asset_code,
-            issuer: nft.asset_issuer,
-            issuerShort: shortAddress(nft.asset_issuer),
-            balance: nft.balance,
-            name: metadata?.name || nft.asset_code,
-            description:
-              metadata?.description || 'No description available',
-            image:
-              metadata?.image ||
-              `https://picsum.photos/300/300?random=${nft.asset_code}`,
-            minted: metadata?.created
-              ? new Date(metadata.created).toLocaleDateString()
-              : 'Unknown',
-          };
-        } catch (error) {
-          // Return basic NFT info if metadata fails
-          return {
-            id: `${nft.asset_code}-${nft.asset_issuer}`,
-            code: nft.asset_code,
-            issuer: nft.asset_issuer,
-            issuerShort: shortAddress(nft.asset_issuer),
-            balance: nft.balance,
-            name: nft.asset_code,
-            description: 'Metadata unavailable',
-            image: `https://picsum.photos/300/300?random=${nft.asset_code}`,
-            minted: 'Unknown',
-          };
-        }
-      })
-    );
-
-    return nftsWithMetadata;
-
-  } catch (error) {
-    console.error('Failed to fetch NFTs:', error);
-    return [];
-  }
-};
-
-// ================================
-// FETCH SINGLE NFT DETAILS
-// ================================
-
-export const fetchNFTDetails = async (assetCode, issuerPublicKey) => {
-  try {
-    const issuerAccount = await server.loadAccount(issuerPublicKey);
-
-    const metadataEntry = issuerAccount.data_attr
-      ? issuerAccount.data_attr['nft_metadata']
-      : null;
-
-    let metadata = null;
-    if (metadataEntry) {
-      const metadataUrl = Buffer.from(
-        metadataEntry,
-        'base64'
-      ).toString('utf-8');
-      metadata = await fetchIPFSMetadata(metadataUrl);
+    } catch (err) {
+      setError('Failed to load NFTs from chain.');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return {
-      code: assetCode,
-      issuer: issuerPublicKey,
-      issuerShort: shortAddress(issuerPublicKey),
-      name: metadata?.name || assetCode,
-      description: metadata?.description || 'No description',
-      image: metadata?.image || null,
-      minted: metadata?.created
-        ? new Date(metadata.created).toLocaleDateString()
-        : 'Unknown',
-      blockchain: 'Stellar Testnet',
-    };
-
-  } catch (error) {
-    throw new Error('Failed to fetch NFT details: ' + error.message);
+  if (loading) {
+    return (
+      <div style={styles.loading}>
+        <p>⏳ Loading NFTs from Stellar...</p>
+      </div>
+    );
   }
-};
 
-// ================================
-// SEARCH NFTS
-// ================================
+  if (error) {
+    return (
+      <div style={styles.empty}>
+        <p>⚠️ {error}</p>
+        <button onClick={loadNFTs} style={styles.retryButton}>
+          🔄 Retry
+        </button>
+      </div>
+    );
+  }
 
-export const searchNFTs = (nfts, query) => {
-  if (!query) return nfts;
-  const lower = query.toLowerCase();
-  return nfts.filter(
-    (nft) =>
-      nft.name.toLowerCase().includes(lower) ||
-      nft.description.toLowerCase().includes(lower) ||
-      nft.code.toLowerCase().includes(lower)
+  if (nfts.length === 0) {
+    return (
+      <div style={styles.empty}>
+        <p>🖼️ No NFTs minted yet</p>
+        <p style={styles.emptyText}>Mint the first one!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.title}>🏛️ NFT Gallery</h2>
+      <p style={styles.count}>{nfts.length} NFTs on-chain</p>
+
+      <div style={styles.grid}>
+        {nfts.map((nft) => (
+          <div key={nft.id} style={styles.card} onClick={() => setSelected(nft)}>
+            <img src={nft.image} alt={nft.name} style={styles.image} />
+            <div style={styles.cardBody}>
+              <h3 style={styles.nftName}>{nft.name}</h3>
+              <p style={styles.nftOwner}>
+                👤 {nft.owner.slice(0, 6)}...{nft.owner.slice(-6)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {selected && (
+        <div style={styles.modal}>
+          <div style={styles.modalContent}>
+            <img src={selected.image} alt={selected.name} style={styles.modalImage} />
+            <h2 style={styles.modalTitle}>{selected.name}</h2>
+            <p style={styles.modalOwner}>
+              👤 Owner: {selected.owner.slice(0, 6)}...{selected.owner.slice(-6)}
+            </p>
+            <p style={styles.modalId}>🔢 Token ID: {selected.id}</p>
+            <button style={styles.closeButton} onClick={() => setSelected(null)}>
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
+}
+
+const styles = {
+  container: { padding: '20px', maxWidth: '800px', margin: '0 auto' },
+  title: { color: '#7c3aed', textAlign: 'center', marginBottom: '8px' },
+  count: { color: '#888888', textAlign: 'center', fontSize: '14px', marginBottom: '24px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' },
+  card: { backgroundColor: '#1a1a1a', borderRadius: '12px', overflow: 'hidden', cursor: 'pointer', border: '1px solid #333333' },
+  image: { width: '100%', height: '180px', objectFit: 'cover' },
+  cardBody: { padding: '12px' },
+  nftName: { color: '#ffffff', fontSize: '14px', marginBottom: '4px' },
+  nftOwner: { color: '#7c3aed', fontSize: '11px', fontFamily: 'monospace' },
+  loading: { textAlign: 'center', color: '#888888', padding: '40px' },
+  empty: { textAlign: 'center', padding: '40px', color: '#ffffff' },
+  emptyText: { color: '#888888', fontSize: '14px' },
+  retryButton: {
+    backgroundColor: '#7c3aed', color: '#ffffff', border: 'none',
+    borderRadius: '8px', padding: '10px 20px', marginTop: '12px', cursor: 'pointer',
+  },
+  modal: {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a', borderRadius: '16px', padding: '24px',
+    maxWidth: '360px', width: '100%', textAlign: 'center',
+  },
+  modalImage: { width: '100%', borderRadius: '12px', marginBottom: '16px' },
+  modalTitle: { color: '#ffffff', marginBottom: '8px' },
+  modalOwner: { color: '#7c3aed', fontSize: '13px', marginBottom: '4px', fontFamily: 'monospace' },
+  modalId: { color: '#888888', fontSize: '13px', marginBottom: '20px' },
+  closeButton: {
+    backgroundColor: '#7c3aed', color: '#ffffff', border: 'none',
+    borderRadius: '8px', padding: '12px 24px', fontSize: '14px',
+    cursor: 'pointer', width: '100%',
+  },
 };
+
+export default Gallery;

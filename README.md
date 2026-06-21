@@ -41,12 +41,12 @@ The app successfully compiles and runs, connecting wallet, mint, gallery, and tr
 
 ### Installation
 
-```bash
+\`\`\`bash
 git clone https://github.com/Keengfk/stellar-nft-app.git
 cd stellar-nft-app
 npm install
 npm start
-```
+\`\`\`
 
 ## 📋 Roadmap
 

@@ -6,8 +6,6 @@ A Digital Art NFT platform built on the Stellar blockchain using JavaScript and 
 
 Stellar NFT App allows artists to mint, showcase, and transfer unique digital art NFTs natively on Stellar — with ultra-low fees and fast transactions.
 
-## ✨ Features
-
 ## ✅ Live & Connected
 
 This app is fully wired to a live Soroban smart contract deployed on Stellar Testnet.
@@ -17,6 +15,8 @@ This app is fully wired to a live Soroban smart contract deployed on Stellar Tes
 **View on Stellar Expert:** https://stellar.expert/explorer/testnet/contract/CBU7UVJM7FAXB7AHCDMTKVJSUEE3PVTV2ROFOKO2P3IC4IKRTB45IHFA
 
 The app successfully compiles and runs, connecting wallet, mint, gallery, and transfer screens directly to on-chain contract calls.
+
+## ✨ Features
 
 - 🔌 Connect Freighter wallet
 - 🖼️ Upload and mint digital art as NFTs on Stellar
@@ -50,10 +50,10 @@ npm start
 
 ## 📋 Roadmap
 
-- [ ] Wallet connection
-- [ ] NFT minting
-- [ ] NFT gallery
-- [ ] NFT transfers
+- [x] Wallet connection
+- [x] NFT minting
+- [x] NFT gallery
+- [x] NFT transfers
 - [ ] Mainnet deployment
 
 ## 🤝 Contributing
@@ -65,7 +65,7 @@ Check the [Issues](https://github.com/Keengfk/stellar-nft-app/issues) tab to get
 
 ## 📄 License
 
-MIT License
+This project is licensed under the [MIT License](LICENSE).
 
 ## 👨‍💻 Author
 

@@ -6,6 +6,10 @@ A Digital Art NFT platform built on the Stellar blockchain using JavaScript and 
 
 Stellar NFT App allows artists to mint, showcase, and transfer unique digital art NFTs natively on Stellar — with ultra-low fees and fast transactions.
 
+## 🌐 Live Demo
+
+👉 **[https://stellar-nft-app-6s6p.vercel.app](https://stellar-nft-app-6s6p.vercel.app)**
+
 ## ✅ Live & Connected
 
 This app is fully wired to a live Soroban smart contract deployed on Stellar Testnet.
